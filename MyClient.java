@@ -6,46 +6,17 @@ import java.nio.charset.StandardCharsets;
 import java.io.*;
 
 public class MyClient {
-    /* Declare and initialise the strings (messages) that
-    will send to the server */
-    public static String HELO = "HELO";
-    public static String AUTH = "AUTH " + System.getProperty("user.name");
-    public static String REDY = "REDY";
-    public static String OK = "OK";
+    /* Declare and initialise the strings (messages with new line chracters) that
+    will send to the server (handling in -n option) */
+    public static String HELO = "HELO" + "\n";
+    public static String AUTH = "AUTH " + System.getProperty("user.name") + "\n";
+    public static String REDY = "REDY" + "\n";
+    public static String OK = "OK" + "\n";
     public static String GETSCAP = "GETS Capable";
-    public static String QUIT = "QUIT";
+    public static String QUIT = "QUIT" + "\n";
 
     // Constructor for MyClient
     public MyClient() {     }
-
-    // Function for reading messages from the server
-    public String readMsg(byte[] b, BufferedInputStream bis) {
-        try {
-            bis.read(b);
-            String str = new String(b, StandardCharsets.UTF_8);
-            return str;
-        } catch (Exception e) {
-            System.out.println(e);
-        }
-        return "error";
-    }
-
-    /* Trim (Remove) all non-printable
-    characters at the end of the array of
-    strings s (at the last index) by checking if 
-    it's actually a number. If it is, append it to the result string 
-    above to get the required data. Otherwise, not and break the loop */
-    public String trimNonPrintableCharacters (String s) {
-        String result = new String();
-        for(int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if(c == '0' || c == '1' || c == '2' || c == '3' || c == '4' || c == '5' ||c == '6' || c == '7' || c == '8' || c == '9')
-                result += c;
-            else
-                break;
-        }
-        return result;
-    }
 
     public static void main (String args[]) throws Exception {
         try {
@@ -54,24 +25,20 @@ public class MyClient {
             Socket s = new Socket("localhost", 50000);
             /* Input and ouput stream for reading and 
             writing messages from and to server */
-            DataInputStream din =  new DataInputStream(s.getInputStream());
             DataOutputStream dout =  new DataOutputStream(s.getOutputStream());
-            BufferedInputStream bin = new BufferedInputStream(din);
             BufferedOutputStream bout = new BufferedOutputStream(dout);
+            InputStreamReader r = new InputStreamReader(s.getInputStream());
+            BufferedReader br = new BufferedReader(r);
 
             /* Print message to check the connection
             with the server */
             System.out.println("Connected with the server");
 
-            /* Declare and initialise an instance of 
-            MyClient for the communication with the server */
-            MyClient mc = new MyClient();
-
             /* Boolean value to check if there are any jobs
             left that need to be scheduled */
             Boolean jobsLeft = true;
 
-            // String for largest server name
+            // String for smallest server name and ID
             String smallestServerName= null;
             String smallestServerID = null;
 
@@ -81,9 +48,9 @@ public class MyClient {
             System.out.println("Sent HELO to the server");
             bout.flush();
 
-            /* Read message from the serevr after the 'HELO'
+            /* Read message from the server after the 'HELO'
             message sent (it's supposed to be "OK" from the server) */
-            String serverReply = mc.readMsg(new byte[2], bin);
+            String serverReply = br.readLine();
             System.out.println("Received in response to HELO: " + serverReply);
 
             /* Authorize the user by sending message to the server */
@@ -92,7 +59,7 @@ public class MyClient {
 
             /* Read message from server after authorization 
             (it's supposed to be "OK" from the server) */
-            serverReply = mc.readMsg(new byte[2], bin);
+            serverReply = br.readLine();
             System.out.println("Received in response to AUTH: " + serverReply);
 
             /* Send "REDY" message to the server to say that
@@ -103,7 +70,7 @@ public class MyClient {
             // While loop for scheduling jobs
             while(jobsLeft) {
                 // Get job (if any) from the server
-                serverReply = mc.readMsg(new byte[64], bin);
+                serverReply = br.readLine();
                 System.out.println("Received in response to REDY: " + serverReply);
 
                 /* If the message received from the server
@@ -139,15 +106,14 @@ public class MyClient {
                     int JobID = Integer.parseInt(JOBNSplit[2]);
                     int JobCores = Integer.parseInt(JOBNSplit[4]);
                     int JobMemory = Integer.parseInt(JOBNSplit[5]);
-                    String disk = mc.trimNonPrintableCharacters(JOBNSplit[6]);
-                    int JobDisk = Integer.parseInt(disk);
+                    int JobDisk = Integer.parseInt(JOBNSplit[6]);
 
                     // Get all server state information (servers that are capable of running the jobs)
-                    bout.write((GETSCAP + " " + JobCores + " " + JobMemory + " " + JobDisk).getBytes());
+                    bout.write((GETSCAP + " " + JobCores + " " + JobMemory + " " + JobDisk + "\n").getBytes());
                     bout.flush();
 
                     // Get the reply of number of capable servers from server
-                    serverReply = mc.readMsg(new byte[32], bin);
+                    serverReply = br.readLine();
                     System.out.println("Received in response to GETS Capable: " + serverReply);
 
                     // Tells server "OK"
@@ -158,37 +124,38 @@ public class MyClient {
                     strings separated by space */
                     String[] message_space = serverReply.split(" ");
                     
-                    String recLen = mc.trimNonPrintableCharacters(message_space[2]);
+                    // Get number of records (servers) that are capable of running the current job
+                    int numRec = Integer.parseInt(message_space[1]);
 
-                    /* Convert string to integer for storing
-                    bytes to read message from the server */
-                    serverReply = mc.readMsg(new byte[Integer.parseInt(message_space[1])*Integer.parseInt(recLen)], bin);
-                    
-                    // System.out.println(serverReply);
-
+                    // Store servers info in an array of string
                     /* An array of strings that stores a list
                     of servers with information like cores, 
                     server names, bootup times, etc. */
-                    String[] arrOfStr = serverReply.split("\n");
+                    String[] servers = new String[numRec];
+                    for(int i = 0; i < numRec; i++)
+                        servers[i] = br.readLine();
+                    
+                    // System.out.println(serverReply);
+                    
                     /* First of all, randomly, get the first
                     server as the smallest one */
-                    String smallestServer = arrOfStr[0];
-                    String[] smallestSplitInfo = arrOfStr[0].split("\\s+");
+                    String smallestServer = servers[0];
+                    String[] smallestSplitInfo = smallestServer.split("\\s+");
                     // Core count of this server
                     int cores = Integer.parseInt(smallestSplitInfo[4]);
-                    for(int i = 0; i < arrOfStr.length; i++) {
+                    for(int i = 0; i < servers.length; i++) {
                         // Current processed server
-                        String[] ServerSplitInfo = arrOfStr[i].split("\\s+");
+                        String[] ServerSplitInfo = servers[i].split("\\s+");
                         /* The number of cores is placed at
                         string index 4 */
                         int currCores = Integer.parseInt(ServerSplitInfo[4]);
 
                         if(currCores < cores) {
                             cores = currCores;
-                            smallestServer = arrOfStr[i];
+                            smallestServer = servers[i];
                         }
                     }
-                    // Get the name and id of capable server
+                    // Get the name and id of smallest server
                     String[] smallestSplit = smallestServer.split("\\s+");
                     smallestServerName = smallestSplit[0];
                     smallestServerID = smallestSplit[1];
@@ -199,20 +166,20 @@ public class MyClient {
 
                     /* Get a response to "OK" as a dot from
                     the server */
-                    serverReply = mc.readMsg(new  byte[1], bin);
+                    serverReply = br.readLine();
                     System.out.println("Received in response to OK is a dot: " + serverReply);
 
                     /* Schedule the job with id JobID to the smallest server with its name and id */
-                    String SCHD = "SCHD" + " " + JobID + " " + smallestServerName + " " + smallestServerID;
+                    String SCHD = "SCHD" + " " + JobID + " " + smallestServerName + " " + smallestServerID + "\n";
                     bout.write(SCHD.getBytes());
                     bout.flush();
 
-                    // Print out the capable server name and id
+                    // Print out the smallest server name and id
                     System.out.println("The smallest server is: " + smallestServerName + " " + smallestServerID);
 
                     /* Get the response to the scheduling 
                     decision from the server as "OK" */
-                    serverReply = mc.readMsg(new byte[2], bin);
+                    serverReply = br.readLine();
                     System.out.println("Received in response to SCHD: " + serverReply);
                     
                     /* Tells the server it's "REDY" for the 
@@ -225,7 +192,7 @@ public class MyClient {
             /* After the loop terminates (there are no jobs 
             left), QUIT and then get the response to 
             "QUIT" from the server */
-            serverReply = mc.readMsg(new byte[32], bin);
+            serverReply = br.readLine();
             System.out.println("Received in response to QUIT: " + serverReply);
 
             /* If server replies back as "QUIT", then close 
@@ -233,8 +200,8 @@ public class MyClient {
             if(serverReply.equals(QUIT)) {
                 bout.close();
                 dout.close();
-                bin.close();
-                din.close();
+                r.close();
+                br.close();
                 s.close();
             }
         }
