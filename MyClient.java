@@ -30,28 +30,22 @@ public class MyClient {
             InputStreamReader r = new InputStreamReader(s.getInputStream());
             BufferedReader br = new BufferedReader(r);
 
-            /* Print message to check the connection
-            with the server */
-            System.out.println("Connected with the server");
-
             /* Boolean value to check if there are any jobs
             left that need to be scheduled */
             Boolean jobsLeft = true;
 
-            // String for smallest server name and ID
-            String smallestServerName= null;
-            String smallestServerID = null;
+            // String for last server name and ID
+            String largestServerName  = null;
+            String largestServerID = null;
 
             /* Firstly, send HELO message to the server to
             start the communication */
             bout.write(HELO.getBytes());
-            System.out.println("Sent HELO to the server");
             bout.flush();
-
+            
             /* Read message from the server after the 'HELO'
             message sent (it's supposed to be "OK" from the server) */
             String serverReply = br.readLine();
-            System.out.println("Received in response to HELO: " + serverReply);
 
             /* Authorize the user by sending message to the server */
             bout.write(AUTH.getBytes());
@@ -60,18 +54,16 @@ public class MyClient {
             /* Read message from server after authorization 
             (it's supposed to be "OK" from the server) */
             serverReply = br.readLine();
-            System.out.println("Received in response to AUTH: " + serverReply);
 
             /* Send "REDY" message to the server to say that
             the client is ready to schedule jobs (if any) from the server */
             bout.write(REDY.getBytes());
             bout.flush();
-
+            
             // While loop for scheduling jobs
             while(jobsLeft) {
                 // Get job (if any) from the server
                 serverReply = br.readLine();
-                System.out.println("Received in response to REDY: " + serverReply);
 
                 /* If the message received from the server
                 is instead "NONE" or "QUIT", which means
@@ -114,7 +106,6 @@ public class MyClient {
 
                     // Get the reply of number of capable servers from server
                     serverReply = br.readLine();
-                    System.out.println("Received in response to GETS Capable: " + serverReply);
 
                     // Tells server "OK"
                     bout.write(OK.getBytes());
@@ -135,30 +126,34 @@ public class MyClient {
                     for(int i = 0; i < numRec; i++)
                         servers[i] = br.readLine();
                     
-                    // System.out.println(serverReply);
-                    
-                    /* First of all, randomly, get the first
-                    server as the smallest one */
-                    String smallestServer = servers[0];
-                    String[] smallestSplitInfo = smallestServer.split("\\s+");
-                    // Core count of this server
-                    int cores = Integer.parseInt(smallestSplitInfo[4]);
+                    // Initally, randomly get the first server as the largest one
+                    String largestServer = servers[0];
+
                     for(int i = 0; i < servers.length; i++) {
                         // Current processed server
                         String[] ServerSplitInfo = servers[i].split("\\s+");
-                        /* The number of cores is placed at
+                        /* Current biggest server among 
+                        the processed ones */
+                        String[] BigSplitInfo = largestServer.split("\\s+");
+                        /* The core number is placed at
                         string index 4 */
-                        int currCores = Integer.parseInt(ServerSplitInfo[4]);
-
-                        if(currCores < cores) {
-                            cores = currCores;
-                            smallestServer = servers[i];
+                        int currentCore = Integer.parseInt(ServerSplitInfo[4]);
+                        int highestCore = Integer.parseInt(BigSplitInfo[4]);
+                        /* The number of waiting jobs is placed at string index 7 */
+                        int currWJobs = Integer.parseInt(ServerSplitInfo[7]);
+                        int wJobs = Integer.parseInt(BigSplitInfo[7]);
+                        /* If current processed core is bigger than the current highest one, 
+                        get the biggest server as the one with that higher core and fewer waiting jobs */
+                        if(currWJobs <= wJobs) {
+                            if(currentCore > highestCore)                       
+                                largestServer= servers[i];
                         }
                     }
-                    // Get the name and id of smallest server
-                    String[] smallestSplit = smallestServer.split("\\s+");
-                    smallestServerName = smallestSplit[0];
-                    smallestServerID = smallestSplit[1];
+                    
+                    // Get the name and id of last server
+                    String[] bigSplit= largestServer.split("\\s+");
+                    largestServerName = bigSplit[0];
+                    largestServerID = bigSplit[1];
 
                     /* Tells server it's "OK" to schedule the job */
                     bout.write(OK.getBytes());
@@ -167,20 +162,15 @@ public class MyClient {
                     /* Get a response to "OK" as a dot from
                     the server */
                     serverReply = br.readLine();
-                    System.out.println("Received in response to OK is a dot: " + serverReply);
 
-                    /* Schedule the job with id JobID to the smallest server with its name and id */
-                    String SCHD = "SCHD" + " " + JobID + " " + smallestServerName + " " + smallestServerID + "\n";
+                    /* Schedule the job with id JobID to the last server with its name and id */
+                    String SCHD = "SCHD" + " " + JobID + " " + largestServerName + " " + largestServerID + "\n";
                     bout.write(SCHD.getBytes());
                     bout.flush();
-
-                    // Print out the smallest server name and id
-                    System.out.println("The smallest server is: " + smallestServerName + " " + smallestServerID);
-
+                    
                     /* Get the response to the scheduling 
                     decision from the server as "OK" */
                     serverReply = br.readLine();
-                    System.out.println("Received in response to SCHD: " + serverReply);
                     
                     /* Tells the server it's "REDY" for the 
                     next job, and then gets started over from
@@ -193,7 +183,7 @@ public class MyClient {
             left), QUIT and then get the response to 
             "QUIT" from the server */
             serverReply = br.readLine();
-            System.out.println("Received in response to QUIT: " + serverReply);
+            //System.out.println("Received in response to QUIT: " + serverReply);
 
             /* If server replies back as "QUIT", then close 
             all the connections, streams and socket */
