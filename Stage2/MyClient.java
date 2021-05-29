@@ -22,21 +22,30 @@ public class MyClient {
     // Constructor for MyClient
     public MyClient() {     }
 
+    // Function for writing message to server
+    public static void writeMsg(BufferedOutputStream bout, String msg) {
+        try {
+            bout.write(msg.getBytes());
+            bout.flush();
+        }
+        catch(Exception e) {
+            System.out.println(e);
+        }
+    }
+
     // Function for initiating communication with the server
     public static void handshake(BufferedOutputStream bout, BufferedReader br) {
         try {
             /* Firstly, send HELO message to the server to
             start the communication */
-            bout.write(HELO.getBytes());
-            bout.flush();
+            writeMsg(bout, HELO);
                 
             /* Read message from the server after the 'HELO'
             message sent (it's supposed to be "OK" from the server) */
             String serverReply = br.readLine();
         
             /* Authorize the user by sending message to the server */
-            bout.write(AUTH.getBytes());
-            bout.flush();
+            writeMsg(bout, AUTH);
 
             /* Read message from server after authorization 
             (it's supposed to be "OK" from the server) */
@@ -44,8 +53,7 @@ public class MyClient {
 
             /* Send "REDY" message to the server to say that
             the client is ready to schedule jobs (if any) from the server */
-            bout.write(REDY.getBytes());
-            bout.flush();
+            writeMsg(bout, REDY);
         }
         catch (Exception e) {
             System.out.println(e);
@@ -74,15 +82,14 @@ public class MyClient {
     public static String[] handleRequest (BufferedOutputStream bout, BufferedReader br, int JobCores, int JobMemory, int JobDisk) {
         try {
             // Get all server state information (servers that are capable of running the jobs)
-            bout.write((GETSCAP + " " + JobCores + " " + JobMemory + " " + JobDisk + "\n").getBytes());
-            bout.flush();
+            String handleGETSCap = GETSCAP + " " + JobCores + " " + JobMemory + " " + JobDisk + "\n";
+            writeMsg(bout, handleGETSCap);
 
             // Get the reply of number of capable servers from server
             String serverReply = br.readLine();
 
             // Tells server "OK"
-            bout.write(OK.getBytes());
-            bout.flush();
+            writeMsg(bout, OK);
 
             /* The reply is actually an array of 
             strings separated by space */
@@ -90,8 +97,9 @@ public class MyClient {
             return message_space;
         }
         catch (Exception e) {
-            return null;
+            System.out.println(e);
         }
+        return null;
     }
 
     // Function for getting the list of servers responded back by the server side
@@ -110,8 +118,9 @@ public class MyClient {
             return servers;
         }
         catch (Exception e) {
-            return null;
+            System.out.println(e);
         }
+        return null;
     }
 
     // Function for getting smallest server among the list of servers
@@ -143,8 +152,7 @@ public class MyClient {
         try {
             /* Schedule the job with id JobID to the smallest server with its name and id */
             String SCHD = "SCHD" + " " + JobID + " " + serverName + " " + serverID + "\n";
-            bout.write(SCHD.getBytes());
-            bout.flush();
+            writeMsg(bout, SCHD);
             
             /* Get the response to the scheduling 
             decision from the server as "OK" */
@@ -153,8 +161,7 @@ public class MyClient {
             /* Tells the server it's "REDY" for the 
             next job, and then gets started over from
             the beginning of the loop */
-            bout.write(REDY.getBytes());
-            bout.flush();
+            writeMsg(bout, REDY);
         }
         catch(Exception e) {
             System.out.println(e);
@@ -194,8 +201,7 @@ public class MyClient {
                 scheduling */
                 if(serverReply.substring(0,4).equals("NONE") || serverReply.substring(0,4).equals(QUIT)) {
                     jobsLeft = false;
-                    bout.write(QUIT.getBytes());
-                    bout.flush();
+                    writeMsg(bout, QUIT);
                     break;
                 }
 
@@ -204,8 +210,7 @@ public class MyClient {
                 next one by saying "REDY" to the server 
                 and keep on scheduling the next one (receiving next message) from the server */
                 if(!(serverReply.substring(0,4).equals("JOBN"))) {
-                    bout.write(REDY.getBytes());
-                    bout.flush();
+                    writeMsg(bout, REDY);
                     continue;
                 }
 
@@ -231,8 +236,7 @@ public class MyClient {
                     String smallestServerID = smallSplit[1];
 
                     /* Tells server it's "OK" to schedule the job */
-                    bout.write(OK.getBytes());
-                    bout.flush();
+                    writeMsg(bout, OK);
 
                     /* Get a response to "OK" as a dot from
                     the server */
